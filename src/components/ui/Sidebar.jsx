@@ -23,8 +23,7 @@ const navItems = [
     { label: 'Settings', icon: Settings, path: '/admin/settings' },
 ];
 
-const Sidebar = () => {
-    const [collapsed, setCollapsed] = useState(false);
+const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
     const navigate = useNavigate();
 
     const handleLogout = async () => {
@@ -33,9 +32,16 @@ const Sidebar = () => {
     };
 
     return (
-        <aside
-            className={`fixed top-0 left-0 h-screen bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 shadow-sm flex flex-col transition-all duration-300 z-30 ${collapsed ? 'w-20' : 'w-64'}`}
-        >
+        <>
+            {mobileOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/50 z-30 md:hidden transition-opacity" 
+                    onClick={() => setMobileOpen(false)}
+                />
+            )}
+            <aside
+                className={`fixed top-0 left-0 h-screen bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 shadow-sm flex flex-col transition-all duration-300 z-40 ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} ${collapsed ? 'md:w-20' : 'md:w-64'} w-64`}
+            >
             {/* Brand */}
             <div className="flex items-center gap-3 px-5 py-5 border-b border-gray-100 dark:border-gray-700">
                 <Library className="w-8 h-8 text-primary flex-shrink-0" />
@@ -53,6 +59,7 @@ const Sidebar = () => {
                         <li key={item.path}>
                             <NavLink
                                 to={item.path}
+                                onClick={() => setMobileOpen(false)}
                                 className={({ isActive }) =>
                                     `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive
                                         ? 'bg-primary/10 text-primary dark:bg-primary/20'
@@ -89,6 +96,7 @@ const Sidebar = () => {
                 </button>
             </div>
         </aside>
+        </>
     );
 };
 

@@ -1,15 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/ui/Sidebar';
 import Header from '../components/ui/Header';
 
 const AdminLayout = () => {
+    const [collapsed, setCollapsed] = useState(false);
+    const [mobileOpen, setMobileOpen] = useState(false);
+
     return (
         <div className="flex min-h-screen bg-background dark:bg-gray-950 transition-colors duration-300">
-            <Sidebar />
-            <div className="flex-1 ml-64 transition-all duration-300 flex flex-col">
-                <Header />
-                <main className="flex-1 p-6 max-w-[1200px] w-full mx-auto animate-fade-in">
+            <Sidebar 
+                collapsed={collapsed} 
+                setCollapsed={setCollapsed} 
+                mobileOpen={mobileOpen} 
+                setMobileOpen={setMobileOpen} 
+            />
+            <div className={`flex-1 transition-all duration-300 flex flex-col min-w-0 ${collapsed ? 'md:ml-20' : 'md:ml-64'} ml-0`}>
+                <Header onMenuClick={() => setMobileOpen(true)} />
+                <main className="flex-1 p-4 sm:p-6 max-w-[1200px] w-full mx-auto animate-fade-in overflow-x-hidden">
                     <Outlet />
                 </main>
             </div>
