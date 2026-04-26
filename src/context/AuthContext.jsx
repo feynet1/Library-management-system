@@ -16,8 +16,15 @@ export const AuthProvider = ({ children }) => {
                 setSession(newSession);
 
                 if (newSession?.user) {
-                    const { data } = await getProfile(newSession.user.id);
-                    setProfile(data ?? null);
+                    const { data, error } = await getProfile(newSession.user.id);
+                    if (error) {
+                        console.error("Error fetching profile:", error);
+                    }
+                    const userProfile = data ?? { ...newSession.user.user_metadata, id: newSession.user.id };
+                    if (!userProfile.role) {
+                        userProfile.role = 'student';
+                    }
+                    setProfile(userProfile);
                 } else {
                     setProfile(null);
                 }

@@ -13,8 +13,11 @@ const Dashboard = () => {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        setStats(mockStats);
-        setIsLoading(false);
+        const timer = setTimeout(() => {
+            setStats(mockStats);
+            setIsLoading(false);
+        }, 500);
+        return () => clearTimeout(timer);
     }, []);
 
     return (

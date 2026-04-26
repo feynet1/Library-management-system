@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Input from '../ui/Input';
 import Button from '../ui/Button';
@@ -15,21 +15,17 @@ const roleRoutes = {
 
 const LoginForm = () => {
     const navigate        = useNavigate();
-    const { profile }     = useAuth();
+    const { session, profile } = useAuth();
     const [showPassword, setShowPassword] = useState(false);
     const [submitError, setSubmitError]   = useState('');
     const [loggingIn, setLoggingIn]       = useState(false);
 
-    // Use a ref to track whether we're waiting for the profile after sign-in.
-    // This avoids calling setState inside the effect body (lint rule: react-hooks/set-state-in-effect).
-    const waitingForProfile = useRef(false);
-
     useEffect(() => {
-        if (waitingForProfile.current && profile?.role) {
-            waitingForProfile.current = false;
-            navigate(roleRoutes[profile.role] || '/login');
+        if (session && profile) {
+            const role = (profile.role || 'student').toLowerCase();
+            navigate(roleRoutes[role] || '/student/dashboard', { replace: true });
         }
-    }, [profile, navigate]);
+    }, [session, profile, navigate]);
 
     const { values, errors, isSubmitting, handleChange, handleSubmit } = useFormValidation(
         { email: '', password: '' },
@@ -49,6 +45,7 @@ const LoginForm = () => {
 
     const onSubmit = async (formData) => {
         setSubmitError('');
+        setLoggingIn(true);
 
         const { error } = await signIn({
             email:    formData.email,
@@ -57,13 +54,8 @@ const LoginForm = () => {
 
         if (error) {
             setSubmitError(error.message);
-            return;
+            setLoggingIn(false);
         }
-
-        // Mark that we're waiting for AuthContext to load the profile,
-        // then the effect above will navigate once profile.role is available.
-        waitingForProfile.current = true;
-        setLoggingIn(true);
     };
 
     const busy = isSubmitting || loggingIn;
@@ -110,7 +102,7 @@ const LoginForm = () => {
             />
 
             <Button type="submit" isLoading={busy}>
-                {loggingIn ? 'Loading your dashboard...' : 'Sign In'}
+                {busy ? 'Loading your dashboard...' : 'Sign In'}
             </Button>
 
             <div className="text-center text-sm text-gray-500 dark:text-gray-400">
