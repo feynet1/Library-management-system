@@ -11,43 +11,63 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const handleSession = async (newSession) => {
-            try {
-                setSession(newSession);
+        let mounted = true;
 
-                if (newSession?.user) {
-                    const { data, error } = await getProfile(newSession.user.id);
-                    if (error) {
-                        console.warn("Could not fetch profile (might not exist yet):", error.message);
-                    }
-                    const userProfile = data ?? { ...newSession.user.user_metadata, id: newSession.user.id };
-                    if (!userProfile.role) {
-                        userProfile.role = 'student';
-                    }
-                    setProfile(userProfile);
-                } else {
+        const handleSession = async (currentSession) => {
+            if (!currentSession?.user) {
+                if (mounted) {
+                    setSession(null);
                     setProfile(null);
+                    setLoading(false);
+                }
+                return;
+            }
+
+            try {
+                if (mounted) setSession(currentSession);
+                
+                const { data, error } = await getProfile(currentSession.user.id);
+                if (error && error.code !== 'PGRST116') {
+                    console.warn("Profile fetch warning:", error);
+                }
+                
+                let userProfile = { id: currentSession.user.id, role: 'student' };
+                if (data) {
+                    userProfile = { ...userProfile, ...data };
+                } else if (currentSession.user.user_metadata) {
+                    userProfile = { ...userProfile, ...currentSession.user.user_metadata };
+                }
+                
+                // Ensure a role is always set
+                if (!userProfile.role) userProfile.role = 'student';
+
+                if (mounted) {
+                    setProfile(userProfile);
+                    setLoading(false);
                 }
             } catch (err) {
                 console.error("AuthContext error:", err);
-                setProfile(null);
-            } finally {
-                setLoading(false);
+                if (mounted) {
+                    setProfile(null);
+                    setLoading(false);
+                }
             }
         };
 
-        // Initialize session on mount to ensure we don't miss the initial event
+        // 1. Get initial session
         supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
             handleSession(initialSession);
         });
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (_event, newSession) => {
-                await handleSession(newSession);
-            }
-        );
+        // 2. Listen for changes (login/logout)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+            handleSession(newSession);
+        });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            mounted = false;
+            subscription?.unsubscribe();
+        };
     }, []);
 
     return (
