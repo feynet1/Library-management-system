@@ -1,18 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Table from '../../components/ui/Table';
-
-const mockBooks = [
-    { id: 1, title: 'Clean Code', author: 'Robert C. Martin', category: 'Software', availability: 'Available' },
-    { id: 2, title: 'The Pragmatic Programmer', author: 'Andrew Hunt', category: 'Software', availability: 'Available' },
-    { id: 3, title: 'Design Patterns', author: 'Gang of Four', category: 'Software', availability: 'Unavailable' },
-    { id: 4, title: 'Introduction to Algorithms', author: 'Thomas H. Cormen', category: 'Computer Science', availability: 'Available' },
-    { id: 5, title: 'Artificial Intelligence', author: 'Stuart Russell', category: 'AI / ML', availability: 'Available' },
-    { id: 6, title: 'Database Systems', author: 'Ramez Elmasri', category: 'Computer Science', availability: 'Unavailable' },
-    { id: 7, title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', category: 'Literature', availability: 'Available' },
-    { id: 8, title: 'To Kill a Mockingbird', author: 'Harper Lee', category: 'Literature', availability: 'Available' },
-];
-
-const categories = ['All', ...new Set(mockBooks.map((b) => b.category))];
+import { fetchBooks } from '../../lib/student';
+import { supabase } from '../../supabase';
 
 const columns = [
     { key: 'title', label: 'Title' },
@@ -21,30 +10,48 @@ const columns = [
     {
         key: 'availability',
         label: 'Availability',
-        render: (row) => (
-            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                row.availability === 'Available'
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
-                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
-            }`}>
-                {row.availability}
-            </span>
-        ),
+        render: (row) => {
+            const isAvail = row.available_copies > 0;
+            return (
+                <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                    isAvail
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
+                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                }`}>
+                    {isAvail ? 'Available' : 'Out of Stock'}
+                </span>
+            );
+        },
     },
 ];
 
 const ViewBooks = () => {
     const [data, setData] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setData(mockBooks);
-            setIsLoading(false);
-        }, 2000);
-        return () => clearTimeout(timer);
+    const loadBooks = useCallback(async () => {
+        const result = await fetchBooks();
+        if (result.error) setError(result.error.message);
+        else setData(result.data || []);
+        setIsLoading(false);
     }, []);
+
+    useEffect(() => {
+        (async () => { await loadBooks(); })();
+
+        const channel = supabase
+            .channel('student-view-books')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'books' }, loadBooks)
+            .subscribe();
+
+        return () => supabase.removeChannel(channel);
+    }, [loadBooks]);
+
+    const categories = useMemo(() => {
+        return ['All', ...new Set(data.map((b) => b.category).filter(Boolean))];
+    }, [data]);
 
     const filteredData = selectedCategory === 'All'
         ? data
@@ -72,6 +79,13 @@ const ViewBooks = () => {
                     </select>
                 </div>
             </div>
+
+            {error && (
+                <div className="mb-4 p-3 rounded-lg bg-error/10 border border-error/20 text-error text-sm">
+                    {error}
+                </div>
+            )}
+
             <Table columns={columns} data={filteredData} isLoading={isLoading} emptyMessage="No books found." />
         </div>
     );

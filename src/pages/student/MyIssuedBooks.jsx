@@ -1,30 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Table from '../../components/ui/Table';
-
-const mockIssuedBooks = [
-    { id: 1, title: 'Clean Code', author: 'Robert C. Martin', issueDate: '2026-01-10', dueDate: '2026-01-25', status: 'Returned' },
-    { id: 2, title: 'The Pragmatic Programmer', author: 'Andrew Hunt', issueDate: '2026-01-28', dueDate: '2026-02-11', status: 'Overdue' },
-    { id: 3, title: 'Introduction to Algorithms', author: 'Thomas H. Cormen', issueDate: '2026-02-01', dueDate: '2026-02-15', status: 'Issued' },
-    { id: 4, title: 'Artificial Intelligence', author: 'Stuart Russell', issueDate: '2026-02-05', dueDate: '2026-02-19', status: 'Issued' },
-    { id: 5, title: 'Design Patterns', author: 'Gang of Four', issueDate: '2026-01-15', dueDate: '2026-01-30', status: 'Returned' },
-];
+import { fetchMyTransactions } from '../../lib/student';
+import { supabase } from '../../supabase';
+import useAuth from '../../hooks/useAuth';
 
 const statusStyles = {
-    Returned: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
-    Issued:   'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400',
-    Overdue:  'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+    returned: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
+    issued:   'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400',
+    overdue:  'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
 };
 
+const fmt = (iso) => iso ? new Date(iso).toLocaleDateString() : '—';
+
 const columns = [
-    { key: 'title', label: 'Title' },
-    { key: 'author', label: 'Author' },
-    { key: 'issueDate', label: 'Issue Date' },
-    { key: 'dueDate', label: 'Due Date' },
+    { key: 'title', label: 'Title', render: (row) => row.books?.title || '—' },
+    { key: 'author', label: 'Author', render: (row) => row.books?.author || '—' },
+    { key: 'issueDate', label: 'Issue Date', render: (row) => fmt(row.issued_at) },
+    { key: 'dueDate', label: 'Due Date', render: (row) => fmt(row.due_date) },
     {
         key: 'status',
         label: 'Status',
         render: (row) => (
-            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusStyles[row.status] || ''}`}>
+            <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${statusStyles[row.status] || ''}`}>
                 {row.status}
             </span>
         ),
@@ -32,19 +29,34 @@ const columns = [
 ];
 
 const MyIssuedBooks = () => {
+    const { session } = useAuth();
     const [data, setData] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    const loadTxns = useCallback(async () => {
+        if (!session?.user?.id) return;
+        const result = await fetchMyTransactions(session.user.id);
+        if (result.error) setError(result.error.message);
+        else setData(result.data || []);
+        setIsLoading(false);
+    }, [session]);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setData(mockIssuedBooks);
-            setIsLoading(false);
-        }, 2000);
-        return () => clearTimeout(timer);
-    }, []);
+        if (session?.user?.id) {
+            (async () => { await loadTxns(); })();
 
-    const overdueCount = data.filter((b) => b.status === 'Overdue').length;
-    const issuedCount  = data.filter((b) => b.status === 'Issued').length;
+            const channel = supabase
+                .channel('student-my-issued')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `student_id=eq.${session.user.id}` }, loadTxns)
+                .subscribe();
+
+            return () => supabase.removeChannel(channel);
+        }
+    }, [session, loadTxns]);
+
+    const overdueCount = data.filter((b) => b.status === 'overdue').length;
+    const issuedCount  = data.filter((b) => b.status === 'issued').length;
 
     return (
         <div className="animate-fade-in">
@@ -56,6 +68,12 @@ const MyIssuedBooks = () => {
                     </p>
                 </div>
             </div>
+
+            {error && (
+                <div className="mb-4 p-3 rounded-lg bg-error/10 border border-error/20 text-error text-sm">
+                    {error}
+                </div>
+            )}
 
             {isLoading ? (
                 <Table columns={columns} data={[]} isLoading={true} />
@@ -78,7 +96,7 @@ const MyIssuedBooks = () => {
                                 <tr
                                     key={row.id || idx}
                                     className={`border-b border-gray-100 dark:border-gray-700 transition-colors duration-150 ${
-                                        row.status === 'Overdue'
+                                        row.status === 'overdue'
                                             ? 'bg-red-50/40 dark:bg-red-950/20 border-l-4 border-l-red-400'
                                             : 'hover:bg-gray-50/50 dark:hover:bg-gray-700/40'
                                     }`}
