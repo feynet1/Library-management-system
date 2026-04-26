@@ -11,14 +11,14 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (_event, newSession) => {
+        const handleSession = async (newSession) => {
+            try {
                 setSession(newSession);
 
                 if (newSession?.user) {
                     const { data, error } = await getProfile(newSession.user.id);
                     if (error) {
-                        console.error("Error fetching profile:", error);
+                        console.warn("Could not fetch profile (might not exist yet):", error.message);
                     }
                     const userProfile = data ?? { ...newSession.user.user_metadata, id: newSession.user.id };
                     if (!userProfile.role) {
@@ -28,8 +28,22 @@ export const AuthProvider = ({ children }) => {
                 } else {
                     setProfile(null);
                 }
-
+            } catch (err) {
+                console.error("AuthContext error:", err);
+                setProfile(null);
+            } finally {
                 setLoading(false);
+            }
+        };
+
+        // Initialize session on mount to ensure we don't miss the initial event
+        supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+            handleSession(initialSession);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (_event, newSession) => {
+                await handleSession(newSession);
             }
         );
 
