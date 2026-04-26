@@ -1,33 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import Table from '../../components/ui/Table';
-
-const mockBooks = [
-    { id: 1, title: 'Clean Code', author: 'Robert C. Martin', category: 'Software', quantity: 5, status: 'Available' },
-    { id: 2, title: 'The Pragmatic Programmer', author: 'Andrew Hunt', category: 'Software', quantity: 3, status: 'Available' },
-    { id: 3, title: 'Design Patterns', author: 'Gang of Four', category: 'Software', quantity: 0, status: 'Out of Stock' },
-    { id: 4, title: 'Introduction to Algorithms', author: 'Thomas H. Cormen', category: 'Computer Science', quantity: 7, status: 'Available' },
-    { id: 5, title: 'Artificial Intelligence', author: 'Stuart Russell', category: 'AI / ML', quantity: 2, status: 'Available' },
-    { id: 6, title: 'Database Systems', author: 'Ramez Elmasri', category: 'Computer Science', quantity: 0, status: 'Out of Stock' },
-];
+import { fetchBooks } from '../../lib/librarian';
+import { supabase } from '../../supabase';
 
 const columns = [
     { key: 'title', label: 'Title' },
     { key: 'author', label: 'Author' },
     { key: 'category', label: 'Category' },
-    { key: 'quantity', label: 'Qty' },
+    { key: 'total_copies', label: 'Total Qty' },
+    { key: 'available_copies', label: 'Available Qty' },
     {
         key: 'status',
         label: 'Status',
-        render: (row) => (
-            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                row.status === 'Available'
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
-                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
-            }`}>
-                {row.status}
-            </span>
-        ),
+        render: (row) => {
+            const isAvailable = row.available_copies > 0;
+            return (
+                <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                    isAvailable
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
+                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                }`}>
+                    {isAvailable ? 'Available' : 'Out of Stock'}
+                </span>
+            );
+        },
     },
     {
         key: 'actions',
@@ -56,18 +53,29 @@ const columns = [
 const ViewBooks = () => {
     const [data, setData] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState('');
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setData(mockBooks);
-            setIsLoading(false);
-        }, 2000);
-        return () => clearTimeout(timer);
+    const loadBooks = useCallback(async () => {
+        const result = await fetchBooks();
+        if (result.error) setError('Failed to load books.');
+        else setData(result.data || []);
+        setIsLoading(false);
     }, []);
 
+    useEffect(() => {
+        (async () => { await loadBooks(); })();
+
+        const channel = supabase
+            .channel('admin-books')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'books' }, loadBooks)
+            .subscribe();
+
+        return () => supabase.removeChannel(channel);
+    }, [loadBooks]);
+
     const handleAction = (action, row) => {
-        if (action === 'edit') alert(`Editing "${row.title}"`);
-        if (action === 'delete') setData((prev) => prev.filter((item) => item.id !== row.id));
+        if (action === 'edit') alert(`Editing "${row.title}" is not yet implemented.`);
+        if (action === 'delete') alert(`Deleting "${row.title}" is not yet implemented.`);
     };
 
     return (
@@ -76,6 +84,13 @@ const ViewBooks = () => {
                 <h2 className="text-xl font-semibold text-text dark:text-slate-100">View Books</h2>
                 <span className="text-sm text-gray-400 dark:text-gray-500">{data.length} total</span>
             </div>
+
+            {error && (
+                <div className="mb-4 p-3 rounded-lg bg-error/10 border border-error/20 text-error text-sm">
+                    {error}
+                </div>
+            )}
+
             <Table columns={columns} data={data} isLoading={isLoading} onAction={handleAction} />
         </div>
     );
