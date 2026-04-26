@@ -6,6 +6,7 @@ import {
     GraduationCap,
     BookOpen,
     ArrowLeftRight,
+    Settings,
     LogOut,
     ChevronLeft,
     ChevronRight,
@@ -19,6 +20,7 @@ const navItems = [
     { label: 'Manage Students', icon: GraduationCap, path: '/admin/students' },
     { label: 'View Books', icon: BookOpen, path: '/admin/books' },
     { label: 'Transactions', icon: ArrowLeftRight, path: '/admin/transactions' },
+    { label: 'Settings', icon: Settings, path: '/admin/settings' },
 ];
 
 const Sidebar = () => {

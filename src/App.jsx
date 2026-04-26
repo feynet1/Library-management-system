@@ -12,6 +12,7 @@ import ManageLibrarians from './pages/admin/ManageLibrarians';
 import ManageStudents from './pages/admin/ManageStudents';
 import ViewBooks from './pages/admin/ViewBooks';
 import AdminTransactions from './pages/admin/Transactions';
+import AdminSettings from './pages/admin/Settings';
 
 // Librarian
 import LibrarianLayout from './layouts/LibrarianLayout';
@@ -47,6 +48,7 @@ function App() {
               <Route path="students" element={<ManageStudents />} />
               <Route path="books" element={<ViewBooks />} />
               <Route path="transactions" element={<AdminTransactions />} />
+              <Route path="settings" element={<AdminSettings />} />
             </Route>
           </Route>
 
