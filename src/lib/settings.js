@@ -18,7 +18,8 @@ export const fetchSystemSetting = async (key) => {
 export const updateSystemSetting = async (key, value) => {
     const { data, error } = await supabase
         .from('system_settings')
-        .upsert({ key, value })
+        .update({ value })
+        .eq('key', key)
         .select()
         .single();
     return { data, error };
